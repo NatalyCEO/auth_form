@@ -3,136 +3,101 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://telegram.org; connect-src 'self' https://telegram.org;">
     <title>Авторизация</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { 
-            font-family: Arial, sans-serif; 
-            padding: 20px;
-            max-width: 100%;
-            box-sizing: border-box;
-        }
+        body { font-family: Arial, sans-serif; padding: 20px; }
         .form-group { margin-bottom: 15px; }
-        input { 
-            padding: 10px; 
-            width: 100%; 
-            box-sizing: border-box;
-            margin-bottom: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        button { 
-            background: #2481cc; 
-            color: white; 
-            border: none; 
-            padding: 12px 15px; 
-            width: 100%;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        #result {
-            color: red; 
-            margin-top: 10px;
-            text-align: center;
-        }
+        input { padding: 10px; width: 100%; box-sizing: border-box; }
+        button { background: #2481cc; color: white; border: none; padding: 12px; width: 100%; }
+        #status { margin-top: 15px; padding: 10px; text-align: center; }
     </style>
 </head>
 <body>
-    <h2 style="text-align: center;">Авторизация</h2>
+    <h2>Авторизация</h2>
     <form id="authForm">
         <div class="form-group">
             <label>Email:</label>
-            <input type="email" id="email" required placeholder="Введите ваш email">
+            <input type="email" id="email" required>
         </div>
         <div class="form-group">
             <label>Пароль:</label>
-            <input type="password" id="password" required placeholder="Введите пароль">
+            <input type="password" id="password" required>
         </div>
         <button type="submit" id="submitBtn">Войти</button>
     </form>
-    <div id="result"></div>
+    <div id="status"></div>
 
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    
     <script>
-        // Проверяем загрузку Telegram WebApp SDK
-        if (!window.Telegram || !window.Telegram.WebApp) {
-            document.getElementById('result').textContent = "Ошибка: Telegram WebApp не загружен";
-            throw new Error("Telegram WebApp SDK not loaded");
-        }
-
-        const tg = window.Telegram.WebApp;
-        
         // Инициализация WebApp
+        const tg = window.Telegram.WebApp;
         tg.expand();
         tg.enableClosingConfirmation();
-        tg.BackButton.hide();
-        
-        const form = document.getElementById('authForm');
-        const resultDiv = document.getElementById('result');
-        const submitBtn = document.getElementById('submitBtn');
 
-        // Получаем user_id из URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const telegram_id = urlParams.get('user_id');
-        
-        if (!telegram_id) {
-            resultDiv.textContent = "Ошибка: не получен user_id";
-            throw new Error("Missing user_id parameter");
-        }
-
-        form.addEventListener('submit', async function(e) {
+        document.getElementById('authForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            const email = document.getElementById('email').value.trim();
-            const password = document.getElementById('password').value;
+            const submitBtn = document.getElementById('submitBtn');
+            const statusDiv = document.getElementById('status');
             
-            // Валидация
-            if (!email || !password) {
-                resultDiv.textContent = "Пожалуйста, заполните все поля";
-                return;
-            }
+            // Получаем данные формы
+            const formData = {
+                action: "auth",
+                email: document.getElementById('email').value,
+                password: document.getElementById('password').value,
+                telegram_id: new URLSearchParams(window.location.search).get('user_id'),
+                timestamp: new Date().toISOString()
+            };
 
+            // Блокируем кнопку на время отправки
             submitBtn.disabled = true;
-            submitBtn.textContent = "Отправка...";
-            resultDiv.textContent = "";
-            
+            statusDiv.textContent = "Отправка данных...";
+            statusDiv.style.color = "blue";
+
             try {
-                // Проверяем доступность API
-                if (typeof tg.sendData !== 'function') {
-                    throw new Error("WebApp API not available");
+                // Попытка 1: Стандартный способ
+                try {
+                    tg.sendData(JSON.stringify(formData));
+                    statusDiv.textContent = "Данные отправлены! Закрываем окно...";
+                    setTimeout(() => tg.close(), 500);
+                    return;
+                } catch (error1) {
+                    console.log("Стандартный метод не сработал:", error1);
+                    
+                    // Попытка 2: Альтернативный способ
+                    try {
+                        tg.postEvent('web_app_data_send', { data: JSON.stringify(formData) });
+                        statusDiv.textContent = "Данные отправлены (альтернативный метод)! Закрываем окно...";
+                        setTimeout(() => tg.close(), 500);
+                        return;
+                    } catch (error2) {
+                        console.log("Альтернативный метод не сработал:", error2);
+                        throw new Error("Оба метода отправки не сработали");
+                    }
                 }
-                
-                // Создаем объект данных
-                const data = {
-                    action: "auth",
-                    email: email,
-                    password: password,
-                    telegram_id: telegram_id,
-                    timestamp: new Date().toISOString()
-                };
-                
-                // Отправляем данные
-                tg.sendData(JSON.stringify(data));
-                
-                // Даем пользователю обратную связь
-                resultDiv.style.color = "green";
-                resultDiv.textContent = "Данные отправлены...";
-                
-                // Закрываем WebApp через небольшой таймаут
-                setTimeout(() => tg.close(), 500);
-                
-            } catch (error) {
-                console.error("WebApp error:", error);
-                resultDiv.textContent = `Ошибка: ${error.message}`;
+            } catch (finalError) {
+                console.error("Все методы отправки провалились:", finalError);
+                statusDiv.textContent = "Ошибка отправки данных. Попробуйте еще раз.";
+                statusDiv.style.color = "red";
                 submitBtn.disabled = false;
-                submitBtn.textContent = "Войти";
+                
+                // Дополнительный fallback - можно добавить кнопку "Отправить вручную"
+                const manualDiv = document.createElement('div');
+                manualDiv.innerHTML = `
+                    <button id="manualSend" style="margin-top: 10px; background: orange;">
+                        Отправить вручную
+                    </button>
+                    <div id="manualStatus"></div>
+                `;
+                document.body.appendChild(manualDiv);
+                
+                document.getElementById('manualSend').addEventListener('click', () => {
+                    // Здесь можно реализовать отправку через fetch API
+                    document.getElementById('manualStatus').textContent = 
+                        "В этом режиме авторизация невозможна. Закройте окно и попробуйте снова.";
+                });
             }
         });
-        
-        // Дополнительная проверка инициализации
-        tg.ready();
     </script>
 </body>
 </html>
