@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://telegram.org; connect-src 'self' https://telegram.org;">
     <title>Авторизация</title>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; max-width: 400px; margin: 0 auto; }
+        body { font-family: Arial, sans-serif; padding: 20px; }
         .form-group { margin-bottom: 15px; }
-        input { padding: 10px; width: 100%; box-sizing: border-box; border: 1px solid #ddd; border-radius: 4px; }
-        button { background: #2481cc; color: white; border: none; padding: 12px 15px; width: 100%; border-radius: 4px; cursor: pointer; }
-        .error { color: red; margin-top: 10px; }
+        input { padding: 8px; width: 100%; box-sizing: border-box; }
+        button { background: #2481cc; color: white; border: none; padding: 10px 15px; width: 100%; }
     </style>
 </head>
 <body>
@@ -25,39 +25,53 @@
         </div>
         <button type="submit">Войти</button>
     </form>
-    <div id="result" class="error"></div>
+    <div id="result" style="color: red; margin-top: 10px;"></div>
 
+    <!-- Обязательно подключаем Telegram WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
     <script>
-        document.getElementById('authForm').addEventListener('submit', function(e) {
-            e.preventDefault();
+        // Ждем полной инициализации WebApp
+        document.addEventListener('DOMContentLoaded', function() {
+            const tg = window.Telegram.WebApp;
             
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            const urlParams = new URLSearchParams(window.location.search);
-            const telegram_id = urlParams.get('user_id');
+            // Инициализируем WebApp
+            tg.expand();
+            tg.enableClosingConfirmation();
             
-            // Проверяем, что WebApp инициализирован
-            if (window.Telegram && Telegram.WebApp) {
-                // Отправляем данные в бота
-                Telegram.WebApp.sendData(JSON.stringify({
-                    action: "login",
-                    email: email,
-                    password: password,
-                    telegram_id: telegram_id
-                }));
+            const form = document.getElementById('authForm');
+            const resultDiv = document.getElementById('result');
+            
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
                 
-                // Закрываем WebApp
-                Telegram.WebApp.close();
-            } else {
-                document.getElementById('result').textContent = "Ошибка: не удалось отправить данные";
-            }
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                const telegram_id = new URLSearchParams(window.location.search).get('user_id');
+                
+                // Проверяем инициализацию WebApp
+                if (typeof tg.sendData !== 'function') {
+                    resultDiv.textContent = "Ошибка: WebApp не инициализирован";
+                    return;
+                }
+                
+                try {
+                    // Отправляем данные в бота
+                    tg.sendData(JSON.stringify({
+                        action: "auth",
+                        email: email,
+                        password: password,
+                        telegram_id: telegram_id
+                    }));
+                    
+                    // Закрываем WebApp
+                    tg.close();
+                } catch (error) {
+                    resultDiv.textContent = `Ошибка отправки: ${error.message}`;
+                    console.error("WebApp error:", error);
+                }
+            });
         });
-        
-        // Инициализация WebApp
-        if (window.Telegram && Telegram.WebApp) {
-            Telegram.WebApp.expand();
-            Telegram.WebApp.enableClosingConfirmation();
-        }
     </script>
 </body>
 </html>
