@@ -5,10 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Авторизация</title>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 400px; margin: 0 auto; }
         .form-group { margin-bottom: 15px; }
-        input { padding: 8px; width: 100%; box-sizing: border-box; }
-        button { background: #2481cc; color: white; border: none; padding: 10px 15px; width: 100%; }
+        input { padding: 10px; width: 100%; box-sizing: border-box; border: 1px solid #ddd; border-radius: 4px; }
+        button { background: #2481cc; color: white; border: none; padding: 12px 15px; width: 100%; border-radius: 4px; cursor: pointer; }
+        .error { color: red; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -24,22 +25,39 @@
         </div>
         <button type="submit">Войти</button>
     </form>
-    
+    <div id="result" class="error"></div>
+
     <script>
         document.getElementById('authForm').addEventListener('submit', function(e) {
             e.preventDefault();
             
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
+            const urlParams = new URLSearchParams(window.location.search);
+            const telegram_id = urlParams.get('user_id');
             
+            // Проверяем, что WebApp инициализирован
             if (window.Telegram && Telegram.WebApp) {
+                // Отправляем данные в бота
                 Telegram.WebApp.sendData(JSON.stringify({
+                    action: "login",
                     email: email,
-                    password: password
+                    password: password,
+                    telegram_id: telegram_id
                 }));
+                
+                // Закрываем WebApp
                 Telegram.WebApp.close();
+            } else {
+                document.getElementById('result').textContent = "Ошибка: не удалось отправить данные";
             }
         });
+        
+        // Инициализация WebApp
+        if (window.Telegram && Telegram.WebApp) {
+            Telegram.WebApp.expand();
+            Telegram.WebApp.enableClosingConfirmation();
+        }
     </script>
 </body>
 </html>
