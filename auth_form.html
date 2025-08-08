@@ -2,116 +2,57 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Авторизация</title>
+    <title>Auth</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            padding: 20px;
-            max-width: 400px;
-            margin: 0 auto;
-            background-color: #f5f5f5;
-        }
-        .form-container {
-            background: white;
-            padding: 25px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        input {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            box-sizing: border-box;
-            font-size: 16px;
-        }
-        button {
-            background: #2481cc;
-            color: white;
-            border: none;
-            padding: 14px;
-            width: 100%;
-            border-radius: 5px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-        #status {
-            margin-top: 15px;
-            padding: 10px;
-            border-radius: 5px;
-            text-align: center;
-        }
+        body { font-family: Arial, padding: 20px; max-width: 400px; margin: 0 auto; }
+        input { display: block; width: 100%; padding: 10px; margin: 10px 0; }
+        button { background: #2481cc; color: white; border: none; padding: 12px; width: 100%; }
     </style>
 </head>
 <body>
-    <div class="form-container">
-        <h2>Авторизация</h2>
-        <div id="status"></div>
-        <form id="authForm">
-            <div class="form-group">
-                <input type="email" id="email" placeholder="Ваш email" required>
-            </div>
-            <div class="form-group">
-                <input type="password" id="password" placeholder="Ваш пароль" required>
-            </div>
-            <button type="submit">Войти</button>
-        </form>
-    </div>
+    <h2>Авторизация</h2>
+    <form id="authForm">
+        <input type="email" id="email" placeholder="Ваш email" required>
+        <input type="password" id="password" placeholder="Ваш пароль" required>
+        <button type="submit">Войти</button>
+    </form>
 
     <script>
+        // Ждем полной загрузки API Telegram
         document.addEventListener('DOMContentLoaded', function() {
-            const form = document.getElementById('authForm');
-            const statusEl = document.getElementById('status');
-            const tg = window.Telegram?.WebApp;
-            
-            // Проверяем, открыто ли в Telegram WebApp
-            const isTelegram = tg && tg.initData;
-            
-            if (isTelegram) {
-                tg.expand();
-                tg.enableClosingConfirmation();
-            } else {
-                statusEl.textContent = "Откройте в Telegram для автоматической авторизации";
-                statusEl.style.color = "#666";
+            // Проверяем, что мы точно внутри Telegram WebApp
+            if (!window.Telegram || !window.Telegram.WebApp || !window.Telegram.WebApp.initData) {
+                document.body.innerHTML = '<h2 style="color:red">Пожалуйста, откройте эту страницу через Telegram бота</h2>';
+                return;
             }
-            
-            form.addEventListener('submit', function(e) {
+
+            const tg = Telegram.WebApp;
+            tg.expand();
+            tg.enableClosingConfirmation();
+
+            document.getElementById('authForm').addEventListener('submit', function(e) {
                 e.preventDefault();
                 
-                const email = document.getElementById('email').value.trim();
-                const password = document.getElementById('password').value.trim();
-                const user_id = isTelegram ? tg.initDataUnsafe.user?.id : null;
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
                 
                 if (!email || !password) {
-                    showError('Заполните все поля!');
+                    alert('Заполните все поля!');
                     return;
                 }
                 
-                if (isTelegram) {
-                    // Отправка данных через Telegram WebApp
-                    const data = {
-                        action: "auth",
-                        email: email,
-                        password: password,
-                        telegram_id: user_id
-                    };
-                    tg.sendData(JSON.stringify(data));
-                    setTimeout(() => tg.close(), 300);
-                } else {
-                    // Альтернативный метод авторизации (например, через API)
-                    showError('Пожалуйста, откройте в Telegram боте');
-                }
+                // Отправляем данные в бота
+                tg.sendData(JSON.stringify({
+                    action: "auth",
+                    email: email,
+                    password: password,
+                    telegram_id: tg.initDataUnsafe.user.id
+                }));
+                
+                // Закрываем WebApp
+                setTimeout(() => tg.close(), 300);
             });
-            
-            function showError(message) {
-                statusEl.textContent = message;
-                statusEl.style.color = "#c62828";
-                statusEl.style.backgroundColor = "#ffebee";
-            }
         });
     </script>
 </body>
