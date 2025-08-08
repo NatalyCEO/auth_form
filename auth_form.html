@@ -1,10 +1,9 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://*.telegram.org; script-src 'self' https://*.telegram.org 'unsafe-inline'; style-src 'self' 'unsafe-inline'">
-    <title>Авторизация ETU</title>
+    <title>Авторизация</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -20,7 +19,7 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
         label {
             display: block;
@@ -28,11 +27,11 @@
             font-weight: bold;
         }
         input {
-            width: 100%;
             padding: 12px;
+            width: 100%;
+            box-sizing: border-box;
             border: 1px solid #ddd;
             border-radius: 5px;
-            box-sizing: border-box;
             font-size: 16px;
         }
         button {
@@ -50,33 +49,23 @@
             background: #1a6fb3;
         }
         #status {
-            margin-top: 20px;
+            margin-top: 15px;
             padding: 10px;
             border-radius: 5px;
             text-align: center;
             display: none;
         }
-        .logo {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        .logo img {
-            height: 50px;
-        }
     </style>
 </head>
 <body>
     <div class="form-container">
-        <div class="logo">
-            <img src="https://etu.ru/assets/images/logo.png" alt="ETU Logo">
-        </div>
         <h2>Авторизация</h2>
-        <p>Введите ваши учетные данные университета</p>
+        <p>Введите ваши учетные данные</p>
         
         <form id="authForm">
             <div class="form-group">
                 <label for="email">Email:</label>
-                <input type="email" id="email" required placeholder="example@etu.ru">
+                <input type="email" id="email" required placeholder="Ваш email">
             </div>
             <div class="form-group">
                 <label for="password">Пароль:</label>
@@ -89,64 +78,46 @@
     </div>
 
     <script>
-        // Инициализация WebApp
         document.addEventListener('DOMContentLoaded', () => {
             console.log('DOM loaded');
             
-            if (!window.Telegram?.WebApp?.initDataUnsafe) {
-                console.error('Telegram WebApp not initialized');
-                showError('Форма работает только внутри Telegram');
+            // Проверка среды выполнения
+            const isTelegram = window.Telegram?.WebApp?.initData;
+            const tg = isTelegram ? Telegram.WebApp : null;
+            
+            if (!isTelegram) {
+                showError('Пожалуйста, откройте эту страницу через Telegram бота');
                 return;
             }
             
-            const tg = window.Telegram.WebApp;
             tg.expand();
             tg.enableClosingConfirmation();
-            
-            console.log('WebApp initialized:', tg.initDataUnsafe);
-            
-            // Получаем параметры из URL
-            const urlParams = new URLSearchParams(window.location.search);
-            const user_id = urlParams.get('user_id');
-            console.log('User ID from URL:', user_id);
+            console.log('Telegram WebApp initialized');
             
             // Обработка формы
-            const form = document.getElementById('authForm');
-            form.addEventListener('submit', async (e) => {
+            document.getElementById('authForm').addEventListener('submit', function(e) {
                 e.preventDefault();
                 
                 const email = document.getElementById('email').value.trim();
                 const password = document.getElementById('password').value.trim();
+                const user_id = tg.initDataUnsafe.user?.id || 
+                               new URLSearchParams(window.location.search).get('user_id');
                 
                 if (!email || !password) {
                     showError('Заполните все поля!');
                     return;
                 }
                 
-                if (!email.endsWith('@etu.ru')) {
-                    showError('Используйте университетский email');
-                    return;
-                }
+                const data = {
+                    action: "auth",
+                    email: email,
+                    password: password,
+                    telegram_id: user_id
+                };
                 
-                try {
-                    console.log('Preparing data...');
-                    const data = {
-                        action: "auth",
-                        email: email,
-                        password: password,
-                        telegram_id: user_id || tg.initDataUnsafe.user?.id
-                    };
-                    
-                    console.log('Sending data:', data);
-                    tg.sendData(JSON.stringify(data));
-                    
-                    // Даем время на отправку перед закрытием
-                    setTimeout(() => tg.close(), 500);
-                    
-                } catch (err) {
-                    console.error('Error sending data:', err);
-                    showError('Ошибка отправки данных');
-                }
+                console.log('Sending data:', data);
+                tg.sendData(JSON.stringify(data));
+                setTimeout(() => tg.close(), 500);
             });
             
             function showError(message) {
@@ -157,26 +128,6 @@
                 statusEl.style.color = '#c62828';
             }
         });
-        // Тестовая отправка данных (для отладки)
-        function testSendData() {
-            const testData = {
-                action: "auth",
-                email: "test@etu.ru",
-                password: "test123",
-                telegram_id: "123456789"
-            };
-            console.log("TEST DATA:", testData);
-            
-            if (window.Telegram?.WebApp?.sendData) {
-                Telegram.WebApp.sendData(JSON.stringify(testData));
-                console.log("Test data sent successfully");
-            } else {
-                console.error("Telegram WebApp API not available");
-            }
-        }
-        
-        // Для теста в браузере
-        window.runTest = testSendData;
     </script>
 </body>
 </html>
