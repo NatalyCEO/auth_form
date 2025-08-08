@@ -157,6 +157,26 @@
                 statusEl.style.color = '#c62828';
             }
         });
+        // Тестовая отправка данных (для отладки)
+        function testSendData() {
+            const testData = {
+                action: "auth",
+                email: "test@etu.ru",
+                password: "test123",
+                telegram_id: "123456789"
+            };
+            console.log("TEST DATA:", testData);
+            
+            if (window.Telegram?.WebApp?.sendData) {
+                Telegram.WebApp.sendData(JSON.stringify(testData));
+                console.log("Test data sent successfully");
+            } else {
+                console.error("Telegram WebApp API not available");
+            }
+        }
+        
+        // Для теста в браузере
+        window.runTest = testSendData;
     </script>
 </body>
 </html>
