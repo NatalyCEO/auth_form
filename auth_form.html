@@ -4,19 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Авторизация</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
             padding: 20px;
-            margin: 0;
-            background-color: #f5f5f5;
-        }
-        .container {
             max-width: 400px;
             margin: 0 auto;
+            background-color: #f5f5f5;
+        }
+        .form-container {
             background: white;
-            padding: 20px;
+            padding: 25px;
             border-radius: 10px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
@@ -25,30 +23,32 @@
         }
         input {
             width: 100%;
-            padding: 10px;
-            box-sizing: border-box;
+            padding: 12px;
             border: 1px solid #ddd;
             border-radius: 5px;
+            box-sizing: border-box;
+            font-size: 16px;
         }
         button {
             background: #2481cc;
             color: white;
             border: none;
-            padding: 12px;
+            padding: 14px;
             width: 100%;
             border-radius: 5px;
+            font-size: 16px;
             cursor: pointer;
         }
         #status {
             margin-top: 15px;
             padding: 10px;
+            border-radius: 5px;
             text-align: center;
-            display: none;
         }
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="form-container">
         <h2>Авторизация</h2>
         <div id="status"></div>
         <form id="authForm">
@@ -63,59 +63,54 @@
     </div>
 
     <script>
-        // Проверяем, открыто ли в Telegram WebApp
-        function isTelegramWebApp() {
-            return window.Telegram && Telegram.WebApp && Telegram.WebApp.initData;
-        }
-
-        // Основная инициализация
         document.addEventListener('DOMContentLoaded', function() {
-            const statusEl = document.getElementById('status');
             const form = document.getElementById('authForm');
+            const statusEl = document.getElementById('status');
+            const tg = window.Telegram?.WebApp;
             
-            if (!isTelegramWebApp()) {
-                statusEl.textContent = "Пожалуйста, откройте эту страницу через Telegram бота";
-                statusEl.style.display = 'block';
-                statusEl.style.color = 'red';
-                form.style.display = 'none';
-                return;
+            // Проверяем, открыто ли в Telegram WebApp
+            const isTelegram = tg && tg.initData;
+            
+            if (isTelegram) {
+                tg.expand();
+                tg.enableClosingConfirmation();
+            } else {
+                statusEl.textContent = "Откройте в Telegram для автоматической авторизации";
+                statusEl.style.color = "#666";
             }
-            
-            const tg = Telegram.WebApp;
-            tg.expand();
-            tg.enableClosingConfirmation();
             
             form.addEventListener('submit', function(e) {
                 e.preventDefault();
                 
-                const email = document.getElementById('email').value;
-                const password = document.getElementById('password').value;
+                const email = document.getElementById('email').value.trim();
+                const password = document.getElementById('password').value.trim();
+                const user_id = isTelegram ? tg.initDataUnsafe.user?.id : null;
                 
                 if (!email || !password) {
                     showError('Заполните все поля!');
                     return;
                 }
                 
-                const data = {
-                    action: "auth",
-                    email: email,
-                    password: password,
-                    telegram_id: tg.initDataUnsafe.user?.id
-                };
-                
-                try {
+                if (isTelegram) {
+                    // Отправка данных через Telegram WebApp
+                    const data = {
+                        action: "auth",
+                        email: email,
+                        password: password,
+                        telegram_id: user_id
+                    };
                     tg.sendData(JSON.stringify(data));
                     setTimeout(() => tg.close(), 300);
-                } catch (err) {
-                    showError('Ошибка отправки данных');
-                    console.error(err);
+                } else {
+                    // Альтернативный метод авторизации (например, через API)
+                    showError('Пожалуйста, откройте в Telegram боте');
                 }
             });
             
             function showError(message) {
                 statusEl.textContent = message;
-                statusEl.style.display = 'block';
-                statusEl.style.color = 'red';
+                statusEl.style.color = "#c62828";
+                statusEl.style.backgroundColor = "#ffebee";
             }
         });
     </script>
