@@ -1,217 +1,131 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Авторизация</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            padding: 20px;
-            background-color: #f5f5f5;
-            margin: 0;
-        }
-        .auth-container {
-            max-width: 400px;
-            margin: 0 auto;
-            background: white;
-            padding: 25px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
-        h2 {
-            color: #333;
-            text-align: center;
-            margin-top: 0;
-        }
-        .form-group {
-            margin-bottom: 20px;
-        }
-        label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: bold;
-        }
-        input {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 16px;
-            box-sizing: border-box;
-        }
-        button {
-            width: 100%;
-            padding: 14px;
-            background-color: #2481cc;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        button:hover {
-            background-color: #1a6fb3;
-        }
-        button:disabled {
-            background-color: #cccccc;
-            cursor: not-allowed;
-        }
-        #status {
-            margin-top: 20px;
-            padding: 12px;
-            border-radius: 5px;
-            text-align: center;
-            display: none;
-        }
-        .error {
-            background-color: #ffebee;
-            color: #d32f2f;
-        }
-        .success {
-            background-color: #e8f5e9;
-            color: #388e3c;
-        }
-        .loading {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(255,255,255,.3);
-            border-radius: 50%;
-            border-top-color: #fff;
-            animation: spin 1s ease-in-out infinite;
-            margin-right: 10px;
-            vertical-align: middle;
-        }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
+        body { font-family: Arial; max-width: 400px; margin: 0 auto; padding: 20px; }
+        .step { display: none; }
+        .active { display: block; }
+        input, button { width: 100%; padding: 10px; margin: 5px 0; box-sizing: border-box; }
+        button { background: #2481cc; color: white; border: none; }
+        #timer { color: #666; text-align: center; }
     </style>
 </head>
 <body>
-    <div class="auth-container">
-        <h2>Авторизация</h2>
-        <form id="authForm">
-            <div class="form-group">
-                <label for="email">Email:</label>
-                <input 
-                    type="email" 
-                    id="email" 
-                    required 
-                    placeholder="Ваш email @etu.ru"
-                    autocomplete="username"
-                >
-            </div>
-            <div class="form-group">
-                <label for="password">Пароль:</label>
-                <input 
-                    type="password" 
-                    id="password" 
-                    required 
-                    placeholder="Ваш пароль"
-                    autocomplete="current-password"
-                >
-            </div>
-            <button type="submit" id="submitBtn">
-                <span id="buttonText">Войти</span>
-                <span id="buttonSpinner" class="loading" style="display: none;"></span>
-            </button>
-        </form>
-        <div id="status"></div>
+    <div id="step1" class="step active">
+        <h2>Введите ваш email</h2>
+        <input type="email" id="email" placeholder="example@etu.ru" required>
+        <button onclick="sendCode()">Получить код</button>
     </div>
 
+    <div id="step2" class="step">
+        <h2>Введите код из email</h2>
+        <input type="text" id="code" placeholder="6-значный код" required>
+        <div id="timer">Код действителен: <span id="time">15:00</span></div>
+        <button onclick="verifyCode()">Подтвердить</button>
+        <button onclick="resendCode()" style="background: #666;">Отправить новый код</button>
+    </div>
+
+    <div id="status"></div>
+
     <script>
-        // Инициализация Telegram WebApp
         const tg = window.Telegram.WebApp;
         tg.expand();
         tg.enableClosingConfirmation();
+        
+        const API_BASE_URL = "https://ваш-сервер.ru"; // Замените на ваш URL
+        let countdown = 15 * 60;
+        let timerInterval;
+        let currentEmail = "";
 
-        // Конфигурация
-        const API_URL = 'http://localhost:8000'; // Для локального тестирования
-        // const API_URL = 'https://ваш-сервер.ру'; // Для продакшена
+        function showStep(stepId) {
+            document.querySelectorAll('.step').forEach(step => {
+                step.classList.remove('active');
+            });
+            document.getElementById(stepId).classList.add('active');
+        }
 
-        document.getElementById('authForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const submitBtn = document.getElementById('submitBtn');
-            const buttonText = document.getElementById('buttonText');
-            const buttonSpinner = document.getElementById('buttonSpinner');
-            const statusDiv = document.getElementById('status');
-            
-            // Получаем данные формы
-            const formData = {
-                email: document.getElementById('email').value.trim(),
-                password: document.getElementById('password').value,
-                telegram_id: new URLSearchParams(window.location.search).get('user_id')
-            };
-
-            // Валидация
-            if (!formData.email || !formData.password) {
-                showStatus('Заполните все поля', 'error');
-                return;
-            }
-
-            if (!formData.email.includes('@')) {
-                showStatus('Введите корректный email', 'error');
-                return;
-            }
-
-            // Показываем индикатор загрузки
-            submitBtn.disabled = true;
-            buttonText.textContent = 'Отправка...';
-            buttonSpinner.style.display = 'inline-block';
-            statusDiv.style.display = 'none';
-
-            try {
-                console.log('Отправка данных:', formData);
-                
-                const response = await fetch(`${API_URL}/api/auth/login`, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify(formData)
-                });
-
-                console.log('Статус ответа:', response.status);
-                
-                const data = await response.json();
-                console.log('Данные ответа:', data);
-
-                if (response.ok) {
-                    showStatus('Авторизация успешна! Закрываем окно...', 'success');
-                    setTimeout(() => tg.close(), 1500);
-                } else {
-                    const errorMsg = data.detail || 'Ошибка авторизации';
-                    showStatus(`Ошибка: ${errorMsg}`, 'error');
-                }
-            } catch (error) {
-                console.error('Ошибка запроса:', error);
-                showStatus('Ошибка соединения с сервером', 'error');
-            } finally {
-                // Восстанавливаем кнопку
-                submitBtn.disabled = false;
-                buttonText.textContent = 'Войти';
-                buttonSpinner.style.display = 'none';
-            }
-        });
-
-        // Функция отображения статуса
-        function showStatus(message, type) {
+        function showStatus(message, isError = false) {
             const statusDiv = document.getElementById('status');
             statusDiv.textContent = message;
+            statusDiv.style.color = isError ? 'red' : 'green';
             statusDiv.style.display = 'block';
-            statusDiv.className = type;
+        }
+
+        function startTimer() {
+            clearInterval(timerInterval);
+            countdown = 15 * 60;
+            updateTimer();
+            timerInterval = setInterval(updateTimer, 1000);
+        }
+
+        function updateTimer() {
+            const minutes = Math.floor(countdown / 60);
+            const seconds = countdown % 60;
+            document.getElementById('time').textContent = 
+                `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
             
-            // Автоматическое скрытие через 5 секунд
-            if (type === 'error') {
-                setTimeout(() => {
-                    statusDiv.style.display = 'none';
-                }, 5000);
+            if (countdown <= 0) {
+                clearInterval(timerInterval);
+                document.getElementById('timer').textContent = 'Срок действия кода истек';
             }
+            countdown--;
+        }
+
+        async function sendCode() {
+            const email = document.getElementById('email').value;
+            const telegramId = new URLSearchParams(window.location.search).get('user_id');
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/auth/send_code`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, telegram_id: telegramId })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    currentEmail = email;
+                    showStep('step2');
+                    startTimer();
+                    showStatus('Код отправлен на ваш email');
+                } else {
+                    showStatus(data.message || 'Ошибка отправки кода', true);
+                }
+            } catch (error) {
+                showStatus('Ошибка соединения с сервером', true);
+            }
+        }
+
+        async function verifyCode() {
+            const code = document.getElementById('code').value;
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/auth/verify_code`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: currentEmail, code })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showStatus('Авторизация успешна!');
+                    setTimeout(() => tg.close(), 2000);
+                } else {
+                    showStatus(data.message || 'Неверный код', true);
+                }
+            } catch (error) {
+                showStatus('Ошибка соединения с сервером', true);
+            }
+        }
+
+        function resendCode() {
+            clearInterval(timerInterval);
+            sendCode();
         }
     </script>
 </body>
