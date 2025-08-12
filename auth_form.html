@@ -81,7 +81,7 @@
         <form id="authForm">
             <div class="form-group">
                 <label for="email">Email:</label>
-                <input type="text" id="email" required placeholder="Введите ваш email">
+                <input type="email" id="email" required placeholder="Введите ваш email">
             </div>
             <div class="form-group">
                 <label for="password">Пароль:</label>
@@ -106,7 +106,7 @@
             
             const submitBtn = document.getElementById('submitBtn');
             const statusDiv = document.getElementById('status');
-            const email = document.getElementById('email');
+            const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
             const telegramId = new URLSearchParams(window.location.search).get('user_id');
 
