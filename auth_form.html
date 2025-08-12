@@ -1,103 +1,179 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Авторизация</title>
+    <title>Авторизация в боте</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        .form-group { margin-bottom: 15px; }
-        input { padding: 10px; width: 100%; box-sizing: border-box; }
-        button { background: #2481cc; color: white; border: none; padding: 12px; width: 100%; }
-        #status { margin-top: 15px; padding: 10px; text-align: center; }
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 400px;
+            margin: 0 auto;
+            background-color: #f5f5f5;
+        }
+        .auth-container {
+            background-color: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h2 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #2481cc;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #1a6fb3;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        #status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+            display: none;
+        }
+        .error {
+            background-color: #ffebee;
+            color: #d32f2f;
+        }
+        .success {
+            background-color: #e8f5e9;
+            color: #388e3c;
+        }
     </style>
 </head>
 <body>
-    <h2>Авторизация</h2>
-    <form id="authForm">
-        <div class="form-group">
-            <label>Email:</label>
-            <input type="email" id="email" required>
-        </div>
-        <div class="form-group">
-            <label>Пароль:</label>
-            <input type="password" id="password" required>
-        </div>
-        <button type="submit" id="submitBtn">Войти</button>
-    </form>
-    <div id="status"></div>
+    <div class="auth-container">
+        <h2>Авторизация</h2>
+        <form id="authForm">
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" required placeholder="Введите ваш email">
+            </div>
+            <div class="form-group">
+                <label for="password">Пароль:</label>
+                <input type="password" id="password" required placeholder="Введите пароль">
+            </div>
+            <button type="submit" id="submitBtn">Войти</button>
+        </form>
+        <div id="status"></div>
+    </div>
 
     <script>
-        // Инициализация WebApp
+        // Инициализация WebApp Telegram
         const tg = window.Telegram.WebApp;
         tg.expand();
         tg.enableClosingConfirmation();
 
+        // URL вашего локального сервера
+        const API_URL = 'http://localhost:8000';
+        
         document.getElementById('authForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
             const submitBtn = document.getElementById('submitBtn');
             const statusDiv = document.getElementById('status');
-            
-            // Получаем данные формы
-            const formData = {
-                action: "auth",
-                email: document.getElementById('email').value,
-                password: document.getElementById('password').value,
-                telegram_id: new URLSearchParams(window.location.search).get('user_id'),
-                timestamp: new Date().toISOString()
-            };
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const telegramId = new URLSearchParams(window.location.search).get('user_id');
+
+            // Валидация
+            if (!email || !password) {
+                showStatus('Заполните все поля', 'error');
+                return;
+            }
 
             // Блокируем кнопку на время отправки
             submitBtn.disabled = true;
-            statusDiv.textContent = "Отправка данных...";
-            statusDiv.style.color = "blue";
+            showStatus('Отправка данных...', 'info');
 
             try {
-                // Попытка 1: Стандартный способ
-                try {
-                    tg.sendData(JSON.stringify(formData));
-                    statusDiv.textContent = "Данные отправлены! Закрываем окно...";
-                    setTimeout(() => tg.close(), 500);
-                    return;
-                } catch (error1) {
-                    console.log("Стандартный метод не сработал:", error1);
-                    
-                    // Попытка 2: Альтернативный способ
-                    try {
-                        tg.postEvent('web_app_data_send', { data: JSON.stringify(formData) });
-                        statusDiv.textContent = "Данные отправлены (альтернативный метод)! Закрываем окно...";
-                        setTimeout(() => tg.close(), 500);
-                        return;
-                    } catch (error2) {
-                        console.log("Альтернативный метод не сработал:", error2);
-                        throw new Error("Оба метода отправки не сработали");
-                    }
-                }
-            } catch (finalError) {
-                console.error("Все методы отправки провалились:", finalError);
-                statusDiv.textContent = "Ошибка отправки данных. Попробуйте еще раз.";
-                statusDiv.style.color = "red";
-                submitBtn.disabled = false;
-                
-                // Дополнительный fallback - можно добавить кнопку "Отправить вручную"
-                const manualDiv = document.createElement('div');
-                manualDiv.innerHTML = `
-                    <button id="manualSend" style="margin-top: 10px; background: orange;">
-                        Отправить вручную
-                    </button>
-                    <div id="manualStatus"></div>
-                `;
-                document.body.appendChild(manualDiv);
-                
-                document.getElementById('manualSend').addEventListener('click', () => {
-                    // Здесь можно реализовать отправку через fetch API
-                    document.getElementById('manualStatus').textContent = 
-                        "В этом режиме авторизация невозможна. Закройте окно и попробуйте снова.";
+                const response = await fetch(`${API_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: email,
+                        password: password,
+                        telegram_id: telegramId
+                    })
                 });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showStatus('Авторизация успешна! Закрываем окно...', 'success');
+                    setTimeout(() => tg.close(), 1500);
+                } else {
+                    const errorMsg = data.detail || 'Ошибка авторизации';
+                    showStatus(`Ошибка: ${errorMsg}`, 'error');
+                }
+            } catch (error) {
+                console.error('Ошибка:', error);
+                showStatus('Сервер недоступен. Проверьте подключение', 'error');
+            } finally {
+                submitBtn.disabled = false;
             }
         });
+
+        // Функция для отображения статуса
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.style.display = 'block';
+            
+            // Очищаем предыдущие классы
+            statusDiv.className = '';
+            
+            // Добавляем соответствующий класс
+            switch(type) {
+                case 'error':
+                    statusDiv.classList.add('error');
+                    break;
+                case 'success':
+                    statusDiv.classList.add('success');
+                    break;
+                case 'info':
+                default:
+                    // Без дополнительных стилей
+                    break;
+            }
+        }
     </script>
 </body>
 </html>
